@@ -1,31 +1,24 @@
 {
   "expo": {
-    "name": "ai-daily-coach",
+    "name": "AI Daily Coach",
     "slug": "ai-daily-coach",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "scheme": "ai-daily-coach",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+    "scheme": "aidailycoach",
+    "experiments": {
+      "typedRoutes": true
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "android": {
+      "package": "com.mansour1997.aidailycoach"
     },
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.mansour1997.aidailycoach"
     },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
+    "extra": {
+      "eas": {
+        "projectId": "ac95b1c2-63a0-4032-8141-d85c24510a87"
+      }
     }
   }
 }
