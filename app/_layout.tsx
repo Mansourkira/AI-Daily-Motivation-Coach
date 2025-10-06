@@ -1,69 +1,28 @@
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { View } from 'react-native';
-import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
-import BottomTabNavigator from '../components/BottomTabNavigator';
+"use client"
 
-function RootLayoutNav() {
-    const { colors } = useTheme();
-
-    return (
-        <View style={{ flex: 1, backgroundColor: colors.background }}>
-            <Stack
-                screenOptions={{
-                    headerStyle: {
-                        backgroundColor: colors.background,
-                    },
-                    headerTintColor: colors.text,
-                    headerTitleStyle: {
-                        fontFamily: 'System',
-                        fontWeight: '600',
-                    },
-                    headerShadowVisible: false,
-                    contentStyle: {
-                        backgroundColor: 'transparent',
-                    },
-                }}
-            >
-                <Stack.Screen
-                    name="index"
-                    options={{
-                        title: 'Daily Coach',
-                        headerShown: true,
-                    }}
-                />
-                <Stack.Screen
-                    name="goals"
-                    options={{
-                        title: 'Goals',
-                        headerShown: true,
-                    }}
-                />
-                <Stack.Screen
-                    name="history"
-                    options={{
-                        title: 'History',
-                        headerShown: true,
-                    }}
-                />
-                <Stack.Screen
-                    name="settings"
-                    options={{
-                        title: 'Settings',
-                        headerShown: true,
-                    }}
-                />
-            </Stack>
-            <BottomTabNavigator />
-            <StatusBar style="auto" />
-        </View>
-    );
-}
+import { useEffect } from "react"
+import { Stack } from "expo-router"
+import { I18nManager } from "react-native"
 
 export default function RootLayout() {
+    // For demo purposes, using hardcoded locale
+    const locale = "en" // Could be 'ar' for RTL
+
+    useEffect(() => {
+        // Enable RTL if Arabic
+        if (locale === "ar" && !I18nManager.isRTL) {
+            I18nManager.forceRTL(true)
+        } else if (locale !== "ar" && I18nManager.isRTL) {
+            I18nManager.forceRTL(false)
+        }
+    }, [locale])
+
     return (
-        <ThemeProvider>
-            <RootLayoutNav />
-        </ThemeProvider>
-    );
+        <Stack
+            screenOptions={{
+                headerShown: false,
+                animation: "slide_from_right",
+            }}
+        />
+    )
 }

@@ -1,124 +1,136 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { Link } from 'expo-router';
-import { useTheme } from '../contexts/ThemeContext';
+"use client"
 
-export default function HomeScreen() {
-    const { colors, isDark } = useTheme();
+import { useState } from "react"
+import { View, Text, StyleSheet } from "react-native"
+import { useRouter } from "expo-router"
+import { Feather } from "@expo/vector-icons"
+import { Screen, Title, Button, Card, Row, COLORS, SPACING } from "../components/UI"
+import { BottomSheetAdjust } from "../components/BottomTabNavigator"
 
-    const styles = StyleSheet.create({
-        container: {
-            flex: 1,
-            backgroundColor: colors.background,
-            paddingHorizontal: 20,
-            paddingTop: 20,
-        },
-        title: {
-            fontSize: 32,
-            fontWeight: 'bold',
-            color: colors.text,
-            marginBottom: 8,
-            fontFamily: 'System',
-        },
-        subtitle: {
-            fontSize: 16,
-            color: colors.textSecondary,
-            marginBottom: 32,
-            fontFamily: 'System',
-        },
-        card: {
-            backgroundColor: colors.surface,
-            borderRadius: 12,
-            padding: 20,
-            marginBottom: 16,
-            borderWidth: 1,
-            borderColor: colors.border,
-        },
-        cardTitle: {
-            fontSize: 18,
-            fontWeight: '600',
-            color: colors.text,
-            marginBottom: 8,
-            fontFamily: 'System',
-        },
-        cardDescription: {
-            fontSize: 14,
-            color: colors.textSecondary,
-            lineHeight: 20,
-            fontFamily: 'System',
-        },
-        button: {
-            backgroundColor: colors.primary,
-            paddingHorizontal: 24,
-            paddingVertical: 12,
-            borderRadius: 8,
-            marginTop: 16,
-            alignSelf: 'flex-start',
-        },
-        buttonText: {
-            color: '#ffffff',
-            fontSize: 16,
-            fontWeight: '600',
-            fontFamily: 'System',
-        },
-        navigationGrid: {
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            justifyContent: 'space-between',
-            marginTop: 32,
-        },
-        navButton: {
-            width: '48%',
-            backgroundColor: colors.surface,
-            padding: 16,
-            borderRadius: 12,
-            marginBottom: 16,
-            borderWidth: 1,
-            borderColor: colors.border,
-            alignItems: 'center',
-        },
-        navButtonText: {
-            color: colors.text,
-            fontSize: 16,
-            fontWeight: '500',
-            fontFamily: 'System',
-        },
-    });
+export default function Home() {
+    const router = useRouter()
+    const [hasGoals] = useState(false) // Toggle this to test both states
+    const [sheetVisible, setSheetVisible] = useState(false)
+
+    const handleDailyTweak = (minutes: number, focus: string) => {
+        console.log("Daily tweak saved:", { minutes, focus })
+    }
+
+    if (!hasGoals) {
+        return (
+            <Screen>
+                <View style={styles.emptyContainer}>
+                    <Title children="Welcome to AI Daily Coach" />
+                    <Text style={styles.emptyText}>Set 1–3 simple goals to get your daily coach.</Text>
+                    <Button label="Start" onPress={() => router.push("/onboarding/language")} kind="primary" />
+                </View>
+            </Screen>
+        )
+    }
 
     return (
-        <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-            <Text style={styles.title}>Welcome to AI Daily Coach</Text>
-            <Text style={styles.subtitle}>Your personal motivation companion</Text>
+        <Screen scroll>
+            <Title children="AI Daily Coach" />
 
-            <View style={styles.card}>
-                <Text style={styles.cardTitle}>Today's Motivation</Text>
-                <Text style={styles.cardDescription}>
-                    Start your day with personalized motivation and guidance. Set goals, track progress, and stay motivated throughout your journey.
-                </Text>
-                <TouchableOpacity style={styles.button}>
-                    <Text style={styles.buttonText}>Get Started</Text>
-                </TouchableOpacity>
+            <Card>
+                <Text style={styles.cardTitle}>Today</Text>
+                <View style={styles.messageBlock}>
+                    <Text style={styles.messageText}>Good morning! Here's your personalized plan for today:</Text>
+                    <View style={styles.taskList}>
+                        <View style={styles.taskItem}>
+                            <Feather name="circle" size={16} color={COLORS.primary} />
+                            <Text style={styles.taskText}>Read for 20 minutes (7:00 AM)</Text>
+                        </View>
+                        <View style={styles.taskItem}>
+                            <Feather name="circle" size={16} color={COLORS.primary} />
+                            <Text style={styles.taskText}>Complete deep work session (9:00 AM)</Text>
+                        </View>
+                    </View>
+                </View>
+
+                <Row gap={SPACING.sm}>
+                    <Button
+                        label="Regenerate"
+                        onPress={() => console.log("Regenerate")}
+                        kind="ghost"
+                        icon={<Feather name="refresh-cw" size={18} color={COLORS.text} />}
+                    />
+                    <Button
+                        label="Save"
+                        onPress={() => console.log("Save")}
+                        kind="secondary"
+                        icon={<Feather name="bookmark" size={18} color={COLORS.bg} />}
+                    />
+                    <Button
+                        label="Share"
+                        onPress={() => console.log("Share")}
+                        kind="ghost"
+                        icon={<Feather name="share-2" size={18} color={COLORS.text} />}
+                    />
+                </Row>
+            </Card>
+
+            <View style={styles.tweakButton}>
+                <Button
+                    label="Daily Tweak"
+                    onPress={() => setSheetVisible(true)}
+                    kind="primary"
+                    icon={<Feather name="sliders" size={18} color={COLORS.bg} />}
+                />
             </View>
 
-            <View style={styles.navigationGrid}>
-                <Link href="/goals" asChild>
-                    <TouchableOpacity style={styles.navButton}>
-                        <Text style={styles.navButtonText}>🎯 Goals</Text>
-                    </TouchableOpacity>
-                </Link>
-
-                <Link href="/history" asChild>
-                    <TouchableOpacity style={styles.navButton}>
-                        <Text style={styles.navButtonText}>📊 History</Text>
-                    </TouchableOpacity>
-                </Link>
-
-                <Link href="/settings" asChild>
-                    <TouchableOpacity style={styles.navButton}>
-                        <Text style={styles.navButtonText}>⚙️ Settings</Text>
-                    </TouchableOpacity>
-                </Link>
-            </View>
-        </ScrollView>
-    );
+            <BottomSheetAdjust
+                visible={sheetVisible}
+                onClose={() => setSheetVisible(false)}
+                onSave={handleDailyTweak}
+                defaultMinutes={10}
+                defaultFocus="reading"
+            />
+        </Screen>
+    )
 }
+
+const styles = StyleSheet.create({
+    emptyContainer: {
+        flex: 1,
+        justifyContent: "center",
+        gap: SPACING.xl,
+    },
+    emptyText: {
+        fontSize: 16,
+        color: COLORS.sub,
+        lineHeight: 24,
+        marginBottom: SPACING.md,
+    },
+    cardTitle: {
+        fontSize: 18,
+        fontWeight: "600",
+        color: COLORS.text,
+        marginBottom: SPACING.md,
+    },
+    messageBlock: {
+        marginBottom: SPACING.lg,
+    },
+    messageText: {
+        fontSize: 15,
+        color: COLORS.text,
+        lineHeight: 22,
+        marginBottom: SPACING.md,
+    },
+    taskList: {
+        gap: SPACING.sm,
+    },
+    taskItem: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: SPACING.sm,
+    },
+    taskText: {
+        fontSize: 15,
+        color: COLORS.text,
+        flex: 1,
+    },
+    tweakButton: {
+        marginTop: SPACING.xl,
+    },
+})
