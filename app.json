@@ -7,7 +7,9 @@
       "typedRoutes": true
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-notifications",
+      "react-native-google-mobile-ads"
     ],
     "android": {
       "package": "com.mansour1997.aidailycoach"

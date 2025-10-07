@@ -1,102 +1,79 @@
-import { create } from "zustand";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { persist, createJSONStorage } from "zustand/middleware";
+import { create } from 'zustand';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { nanoid } from 'nanoid/non-secure';
 
-export type Category = "health" | "study" | "work" | "finance" | "faith" | "personal" | "relationships";
-export type Mode = "starter" | "balanced" | "sprint";
-export type Locale = "en" | "fr" | "ar";
+export type Locale = 'en'|'fr'|'ar';
+export type Focus = 'health'|'study'|'work'|'finance'|'faith'|'personal'|'relationships'|string;
 
-export type Goal = {
-    id: string;
-    text: string;            // <= 80 chars
-    category?: Category;     // optional for MVP
-    createdAt: number;
-    archivedAt?: number;
+export type Goal = { id: string; text: string; createdAt: string; archivedAt?: string; };
+export type DailyTask = { id: string; text: string; at?: string; done: boolean; };
+export type DailyPlan = { id: string; date: string; tasks: DailyTask[]; sourcePromptHash?: string; };
+
+export type Settings = {
+  locale: Locale;
+  wakeTime: string;      // "07:00"
+  focusAreas: Focus[];   // up to 3
+  notifications: boolean;
+  name?: string;
+  adsConsent?: 'granted'|'denied'|'not_set';
 };
 
-type GoalsState = {
-    active: Goal[];
-    archived: Goal[];
-    addGoal: (text: string) => void;              // validates count <= 3
-    archiveGoal: (id: string) => void;
-    addGoalsFromStrings: (goals: string[]) => void;
+type CoachState = {
+  onboardingDone?: boolean; // undefined until hydrate
+  goals: Goal[];
+  settings: Settings;
+  plans: Record<string, DailyPlan>; // date -> plan
+  lastGeneratedAt?: string;
+
+  // actions
+  setOnboardingDone: (v: boolean) => void;
+  setSettings: (patch: Partial<Settings>) => void;
+  addGoal: (text: string) => void;
+  removeGoal: (id: string) => void;
+  savePlan: (plan: DailyPlan) => void;
+  toggleTask: (date: string, taskId: string) => void;
+  hasGoals: () => boolean;
 };
 
-type Settings = {
-    locale: Locale;
-    mode: Mode;
+const defaultSettings: Settings = {
+  locale: 'en',
+  wakeTime: '07:00',
+  focusAreas: [],
+  notifications: false,
+  adsConsent: 'not_set',
 };
 
-type Store = {
-    hydrated: boolean;
-    pendingGoals: string[];
-    setPendingGoals: (g: string[]) => void;
+export const useCoach = create<CoachState>()(
+  persist(
+    (set, get) => ({
+      onboardingDone: false,
+      goals: [],
+      settings: defaultSettings,
+      plans: {},
 
-    goals: GoalsState;
-    settings: Settings;
-    setLocale: (l: Locale) => void;
-    setMode: (m: Mode) => void;
-};
+      setOnboardingDone: (v) => set({ onboardingDone: v }),
+      setSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
 
-const stripPII = (s: string) => s.replace(/([\w.+-]+@[\w-]+\.[\w.-]+)/g, "***")
-    .replace(/\b(\+?\d[\d\s-]{6,})\b/g, "***")
-    .trim();
+      addGoal: (text) => set((s) => ({
+        goals: [...s.goals, { id: nanoid(), text: text.trim().slice(0, 80), createdAt: new Date().toISOString() }]
+      })),
+      removeGoal: (id) => set((s) => ({ goals: s.goals.filter(g => g.id !== id) })),
 
-const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+      savePlan: (plan) => set((s) => ({
+        plans: { ...s.plans, [plan.date]: plan },
+        lastGeneratedAt: new Date().toISOString()
+      })),
 
-export const useAppStore = create<Store>()(
-    persist(
-        (set, get) => ({
-            hydrated: true, // Set to true initially to avoid hydration issues
-            pendingGoals: [],
-            setPendingGoals: (g) => set({ pendingGoals: g }),
+      toggleTask: (date, taskId) => set((s) => {
+        const plan = s.plans[date];
+        if (!plan) return s as CoachState;
+        const tasks = plan.tasks.map(t => t.id === taskId ? { ...t, done: !t.done } : t);
+        return { plans: { ...s.plans, [date]: { ...plan, tasks } } } as Partial<CoachState>;
+      }),
 
-            goals: {
-                active: [],
-                archived: [],
-                addGoal: (text) => {
-                    const clean = stripPII(text).slice(0, 80);
-                    const { active } = get().goals;
-                    if (active.length >= 3 || !clean) return;
-                    const g: Goal = { id: uid(), text: clean, createdAt: Date.now() };
-                    set({ goals: { ...get().goals, active: [...active, g] } });
-                },
-                archiveGoal: (id) => {
-                    const { active, archived } = get().goals;
-                    const found = active.find(g => g.id === id);
-                    if (!found) return;
-                    found.archivedAt = Date.now();
-                    set({ goals: { active: active.filter(g => g.id !== id), archived: [found, ...archived] } });
-                },
-                addGoalsFromStrings: (arr) => {
-                    const clean = arr.map(s => stripPII(s).slice(0, 80)).filter(Boolean);
-                    const active = get().goals.active.slice(0, 3);
-                    const remaining = 3 - active.length;
-                    const toAdd = clean.slice(0, remaining).map(t => ({ id: uid(), text: t, createdAt: Date.now() } as Goal));
-                    set({ goals: { ...get().goals, active: [...active, ...toAdd] }, pendingGoals: [] });
-                }
-            },
-
-            settings: {
-                locale: "en",
-                mode: "starter"
-            },
-            setLocale: (l) => set({ settings: { ...get().settings, locale: l } }),
-            setMode: (m) => set({ settings: { ...get().settings, mode: m } }),
-        }),
-        {
-            name: "aidailycoach",
-            storage: createJSONStorage(() => AsyncStorage),
-            onRehydrateStorage: () => (state) => {
-                if (state) {
-                    state.hydrated = true;
-                }
-            },
-            partialize: (s) => ({
-                goals: s.goals,
-                settings: s.settings,
-            })
-        }
-    )
+      hasGoals: () => get().goals.length > 0,
+    }),
+    { name: 'ai-daily-coach', storage: createJSONStorage(() => AsyncStorage) }
+  )
 );
-
