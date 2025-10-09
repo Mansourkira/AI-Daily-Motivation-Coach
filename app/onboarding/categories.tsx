@@ -5,17 +5,14 @@ import { View, StyleSheet } from "react-native"
 import { useRouter } from "expo-router"
 import { Screen, Title, Button, SPACING } from "../../components/UI"
 import { ChipGroup } from "../../components/Chips"
-import { useCoach } from "@/contexts/store"
-import type { Focus } from "@/contexts/store"
 
-const CATEGORIES: Focus[] = ["health", "study", "work", "finance", "faith", "personal", "relationships"]
+const CATEGORIES = ["health", "study", "work", "finance", "faith", "personal", "relationships"]
 
 export default function CategoriesScreen() {
     const router = useRouter()
-    const { setSettings } = useCoach()
-    const [selected, setSelected] = useState<Focus[]>([])
+    const [selected, setSelected] = useState<string[]>([])
 
-    const handleToggle = (category: Focus) => {
+    const handleToggle = (category: string) => {
         if (selected.includes(category)) {
             setSelected(selected.filter((c) => c !== category))
         } else if (selected.length < 3) {
@@ -24,7 +21,6 @@ export default function CategoriesScreen() {
     }
 
     const handleContinue = () => {
-        setSettings({ focusAreas: selected })
         const categoriesParam = selected.join(",")
         router.push(`/onboarding/quick?cats=${categoriesParam}`)
     }

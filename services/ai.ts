@@ -33,3 +33,4 @@ export async function generatePlan({ date, tweak }: GenInput): Promise<DailyPlan
   return { id: nanoid(), date, tasks };
 }
 
+

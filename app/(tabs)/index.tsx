@@ -100,3 +100,4 @@ const styles = StyleSheet.create({
   secondaryText: { color: '#fff', fontWeight: '600' },
 });
 
+

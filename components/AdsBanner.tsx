@@ -5,3 +5,4 @@ export default function AdsBanner() {
   return <BannerAd unitId={unitId} size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER} />;
 }
 
+

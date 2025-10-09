@@ -2,15 +2,12 @@
 import { View, StyleSheet } from "react-native"
 import { useRouter } from "expo-router"
 import { Screen, Title, Button, SPACING } from "../../components/UI"
-import { useCoach } from "@/contexts/store"
-import type { Locale } from "@/contexts/store"
 
 export default function LanguageScreen() {
     const router = useRouter()
-    const { setSettings } = useCoach()
 
-    const selectLanguage = (lang: Locale) => {
-        setSettings({ locale: lang })
+    const selectLanguage = (lang: string) => {
+        console.log("Selected language:", lang)
         router.push("/onboarding/categories")
     }
 
