@@ -1,4 +1,5 @@
-import { databaseService } from "../services/database";
+import { databaseService } from "@/services/database";
+import { useCoach } from "@/contexts/store";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
@@ -7,6 +8,7 @@ const DBReadyCtx = createContext(false);
 export function DBProvider({ children }: { children: React.ReactNode }) {
     const [ready, setReady] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const loadData = useCoach((state) => state.loadData);
 
     useEffect(() => {
         let isMounted = true;
@@ -14,7 +16,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
 
         (async () => {
             try {
-                console.log("Initializing database...");
+                console.log("Initializing Supabase database...");
 
                 // Add a timeout to prevent infinite loading
                 timeoutId = setTimeout(() => {
@@ -23,10 +25,15 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
                         setReady(true);
                         setError("Database initialization timeout");
                     }
-                }, 10000); // 10 second timeout
+                }, 15000); // 15 second timeout for network requests
 
+                // Initialize database
                 await databaseService.initDatabase();
-                console.log("Database initialized successfully");
+                console.log("Supabase database initialized successfully");
+
+                // Load data into store
+                await loadData();
+                console.log("Data loaded into store");
 
                 if (isMounted) {
                     clearTimeout(timeoutId!);
@@ -48,13 +55,13 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
             isMounted = false;
             if (timeoutId) clearTimeout(timeoutId!);
         };
-    }, []);
+    }, [loadData]);
 
     if (!ready) {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#2563EB" />
-                <Text style={styles.loadingText}>Initialisation de la base de données...</Text>
+                <Text style={styles.loadingText}>Connecting to cloud database...</Text>
             </View>
         );
     }
@@ -62,7 +69,8 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     if (error) {
         return (
             <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>Erreur: {error}</Text>
+                <Text style={styles.errorText}>Error: {error}</Text>
+                <Text style={styles.errorHint}>Make sure your internet connection is active</Text>
             </View>
         );
     }
@@ -94,6 +102,12 @@ const styles = StyleSheet.create({
     errorText: {
         fontSize: 16,
         color: '#EF4444',
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    errorHint: {
+        fontSize: 14,
+        color: '#6B7280',
         textAlign: 'center',
     },
 });

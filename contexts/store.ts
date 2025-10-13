@@ -1,10 +1,9 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { databaseService } from '@/services/database';
 import { nanoid } from 'nanoid/non-secure';
 
-export type Locale = 'en'|'fr'|'ar';
-export type Focus = 'health'|'study'|'work'|'finance'|'faith'|'personal'|'relationships'|string;
+export type Locale = 'en' | 'fr' | 'ar';
+export type Focus = 'health' | 'study' | 'work' | 'finance' | 'faith' | 'personal' | 'relationships' | string;
 
 export type Goal = { id: string; text: string; createdAt: string; archivedAt?: string; };
 export type DailyTask = { id: string; text: string; at?: string; done: boolean; };
@@ -16,23 +15,25 @@ export type Settings = {
   focusAreas: Focus[];   // up to 3
   notifications: boolean;
   name?: string;
-  adsConsent?: 'granted'|'denied'|'not_set';
+  adsConsent?: 'granted' | 'denied' | 'not_set';
 };
 
 type CoachState = {
-  onboardingDone?: boolean; // undefined until hydrate
+  onboardingDone?: boolean;
   goals: Goal[];
   settings: Settings;
   plans: Record<string, DailyPlan>; // date -> plan
   lastGeneratedAt?: string;
+  isLoading: boolean;
 
   // actions
-  setOnboardingDone: (v: boolean) => void;
-  setSettings: (patch: Partial<Settings>) => void;
-  addGoal: (text: string) => void;
-  removeGoal: (id: string) => void;
-  savePlan: (plan: DailyPlan) => void;
-  toggleTask: (date: string, taskId: string) => void;
+  loadData: () => Promise<void>;
+  setOnboardingDone: (v: boolean) => Promise<void>;
+  setSettings: (patch: Partial<Settings>) => Promise<void>;
+  addGoal: (text: string) => Promise<void>;
+  removeGoal: (id: string) => Promise<void>;
+  savePlan: (plan: DailyPlan) => Promise<void>;
+  toggleTask: (date: string, taskId: string) => Promise<void>;
   hasGoals: () => boolean;
 };
 
@@ -44,36 +45,76 @@ const defaultSettings: Settings = {
   adsConsent: 'not_set',
 };
 
-export const useCoach = create<CoachState>()(
-  persist(
-    (set, get) => ({
-      onboardingDone: false,
-      goals: [],
-      settings: defaultSettings,
-      plans: {},
+export const useCoach = create<CoachState>((set, get) => ({
+  onboardingDone: false,
+  goals: [],
+  settings: defaultSettings,
+  plans: {},
+  isLoading: false,
 
-      setOnboardingDone: (v) => set({ onboardingDone: v }),
-      setSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
+  loadData: async () => {
+    try {
+      set({ isLoading: true });
 
-      addGoal: (text) => set((s) => ({
-        goals: [...s.goals, { id: nanoid(), text: text.trim().slice(0, 80), createdAt: new Date().toISOString() }]
-      })),
-      removeGoal: (id) => set((s) => ({ goals: s.goals.filter(g => g.id !== id) })),
+      const [onboardingDone, goals, settings, plans] = await Promise.all([
+        databaseService.getOnboardingStatus(),
+        databaseService.getGoals(),
+        databaseService.getSettings(),
+        databaseService.getPlans(),
+      ]);
 
-      savePlan: (plan) => set((s) => ({
-        plans: { ...s.plans, [plan.date]: plan },
-        lastGeneratedAt: new Date().toISOString()
-      })),
+      set({
+        onboardingDone,
+        goals,
+        settings,
+        plans,
+        isLoading: false,
+      });
+    } catch (error) {
+      console.error('Error loading data:', error);
+      set({ isLoading: false });
+    }
+  },
 
-      toggleTask: (date, taskId) => set((s) => {
-        const plan = s.plans[date];
-        if (!plan) return s as CoachState;
-        const tasks = plan.tasks.map(t => t.id === taskId ? { ...t, done: !t.done } : t);
-        return { plans: { ...s.plans, [date]: { ...plan, tasks } } } as Partial<CoachState>;
-      }),
+  setOnboardingDone: async (v) => {
+    await databaseService.setOnboardingDone(v);
+    set({ onboardingDone: v });
+  },
 
-      hasGoals: () => get().goals.length > 0,
-    }),
-    { name: 'ai-daily-coach', storage: createJSONStorage(() => AsyncStorage) }
-  )
-);
+  setSettings: async (patch) => {
+    const newSettings = { ...get().settings, ...patch };
+    await databaseService.updateSettings(patch);
+    set({ settings: newSettings });
+  },
+
+  addGoal: async (text) => {
+    const goal = await databaseService.addGoal(text);
+    set((s) => ({ goals: [...s.goals, goal] }));
+  },
+
+  removeGoal: async (id) => {
+    await databaseService.removeGoal(id);
+    set((s) => ({ goals: s.goals.filter(g => g.id !== id) }));
+  },
+
+  savePlan: async (plan) => {
+    await databaseService.savePlan(plan);
+    set((s) => ({
+      plans: { ...s.plans, [plan.date]: plan },
+      lastGeneratedAt: new Date().toISOString()
+    }));
+  },
+
+  toggleTask: async (date, taskId) => {
+    await databaseService.toggleTask(date, taskId);
+
+    set((s) => {
+      const plan = s.plans[date];
+      if (!plan) return s as CoachState;
+      const tasks = plan.tasks.map(t => t.id === taskId ? { ...t, done: !t.done } : t);
+      return { plans: { ...s.plans, [date]: { ...plan, tasks } } } as Partial<CoachState>;
+    });
+  },
+
+  hasGoals: () => get().goals.length > 0,
+}));
