@@ -17,7 +17,9 @@
     "expo-localization": "~17.0.7",
     "expo-notifications": "~0.32.12",
     "expo-router": "^6.0.10",
+    "expo-sqlite": "^16.0.3",
     "expo-status-bar": "~3.0.8",
+    "expo-file-system": "^19.0.2",
     "expo-system-ui": "~4.0.4",
     "i18next": "^25.5.3",
     "nanoid": "^3.3.7",
@@ -32,6 +34,7 @@
   "devDependencies": {
     "@types/react": "~19.1.0",
     "babel-plugin-module-resolver": "^5.0.2",
+    "babel-preset-expo": "~12.0.5",
     "typescript": "~5.9.2"
   },
   "private": true
