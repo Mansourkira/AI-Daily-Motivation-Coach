@@ -62,6 +62,9 @@ export const useCoach = create<CoachState>((set, get) => ({
     try {
       set({ isLoading: true });
 
+      // Ensure database is initialized before loading data
+      await databaseService.initDatabase();
+
       const [onboardingDone, goals, settings, plans] = await Promise.all([
         databaseService.getOnboardingStatus(),
         databaseService.getGoals(),
@@ -79,31 +82,37 @@ export const useCoach = create<CoachState>((set, get) => ({
     } catch (error) {
       console.error('Error loading data:', error);
       set({ isLoading: false });
+      throw error; // Re-throw to let the caller handle it
     }
   },
 
   setOnboardingDone: async (v) => {
+    await databaseService.initDatabase();
     await databaseService.setOnboardingDone(v);
     set({ onboardingDone: v });
   },
 
   setSettings: async (patch) => {
+    await databaseService.initDatabase();
     const newSettings = { ...get().settings, ...patch };
     await databaseService.updateSettings(patch);
     set({ settings: newSettings });
   },
 
   addGoal: async (text) => {
+    await databaseService.initDatabase();
     const goal = await databaseService.addGoal(text);
     set((s) => ({ goals: [...s.goals, goal] }));
   },
 
   removeGoal: async (id) => {
+    await databaseService.initDatabase();
     await databaseService.removeGoal(id);
     set((s) => ({ goals: s.goals.filter(g => g.id !== id) }));
   },
 
   savePlan: async (plan) => {
+    await databaseService.initDatabase();
     await databaseService.savePlan(plan);
     set((s) => ({
       plans: { ...s.plans, [plan.date]: plan },
@@ -112,6 +121,7 @@ export const useCoach = create<CoachState>((set, get) => ({
   },
 
   toggleTask: async (date, taskId) => {
+    await databaseService.initDatabase();
     await databaseService.toggleTask(date, taskId);
 
     set((s) => {

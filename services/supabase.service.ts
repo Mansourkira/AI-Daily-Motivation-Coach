@@ -371,6 +371,108 @@ class SupabaseService {
     }
 
     /**
+     * Archive a goal by setting archived_at timestamp
+     */
+    async archiveGoal(goalId: string): Promise<void> {
+        const client = this.getClient();
+        const userId = await this.ensureAuth();
+
+        const { error } = await client
+            .from('goals')
+            .update({ archived_at: new Date().toISOString() })
+            .eq('id', goalId)
+            .eq('user_id', userId);
+
+        if (error) {
+            throw new Error(`Failed to archive goal: ${error.message}`);
+        }
+
+        console.log('✅ Goal archived:', goalId);
+    }
+
+    /**
+     * Save a daily plan with tasks
+     */
+    async savePlan(plan: any): Promise<void> {
+        const client = this.getClient();
+        const userId = await this.ensureAuth();
+
+        // First, upsert the plan
+        const { data: planData, error: planError } = await client
+            .from('plans')
+            .upsert({
+                user_id: userId,
+                date: plan.date,
+                source_prompt_hash: plan.sourcePromptHash,
+            })
+            .select('id')
+            .single();
+
+        if (planError) {
+            throw new Error(`Failed to save plan: ${planError.message}`);
+        }
+
+        // Delete existing tasks for this plan
+        await client
+            .from('tasks')
+            .delete()
+            .eq('plan_id', planData.id);
+
+        // Insert new tasks
+        if (plan.tasks && plan.tasks.length > 0) {
+            const tasks = plan.tasks.map((task: any, index: number) => ({
+                plan_id: planData.id,
+                text: task.text,
+                at: task.at,
+                done: task.done || false,
+                order_index: index,
+            }));
+
+            const { error: tasksError } = await client
+                .from('tasks')
+                .insert(tasks);
+
+            if (tasksError) {
+                throw new Error(`Failed to save tasks: ${tasksError.message}`);
+            }
+        }
+
+        console.log('✅ Plan and tasks saved:', plan.date);
+    }
+
+    /**
+     * Toggle task completion status
+     */
+    async toggleTask(taskId: string): Promise<void> {
+        const client = this.getClient();
+        const userId = await this.ensureAuth();
+
+        // Get current task status
+        const { data: task, error: fetchError } = await client
+            .from('tasks')
+            .select('done, plans!inner(user_id)')
+            .eq('id', taskId)
+            .eq('plans.user_id', userId)
+            .single();
+
+        if (fetchError) {
+            throw new Error(`Failed to fetch task: ${fetchError.message}`);
+        }
+
+        // Toggle the done status
+        const { error: updateError } = await client
+            .from('tasks')
+            .update({ done: !task.done })
+            .eq('id', taskId);
+
+        if (updateError) {
+            throw new Error(`Failed to toggle task: ${updateError.message}`);
+        }
+
+        console.log('✅ Task toggled:', taskId, 'to', !task.done);
+    }
+
+    /**
      * Get onboarding status
      */
     async getOnboardingStatus(): Promise<boolean> {

@@ -141,9 +141,14 @@ class SupabaseDatabaseService {
     async removeGoal(id: string): Promise<void> {
         this.ensureInitialized();
 
-        // Archive goal by updating archived_at field
-        console.log('Removing goal:', id);
-        // This would need to be implemented in supabaseService if needed
+        try {
+            // Archive goal by updating archived_at field
+            await supabaseService.archiveGoal(id);
+            console.log('✅ Goal archived:', id);
+        } catch (error) {
+            console.error('Error archiving goal:', error);
+            throw error;
+        }
     }
 
     // ---- Plans & Tasks ----
@@ -175,15 +180,25 @@ class SupabaseDatabaseService {
     async savePlan(plan: DailyPlan): Promise<void> {
         this.ensureInitialized();
 
-        // This would need to be implemented in supabaseService
-        console.log('Saving plan:', plan);
+        try {
+            await supabaseService.savePlan(plan);
+            console.log('✅ Plan saved:', plan.date);
+        } catch (error) {
+            console.error('Error saving plan:', error);
+            throw error;
+        }
     }
 
     async toggleTask(date: string, taskId: string): Promise<void> {
         this.ensureInitialized();
 
-        // This would need to be implemented in supabaseService
-        console.log('Toggling task:', date, taskId);
+        try {
+            await supabaseService.toggleTask(taskId);
+            console.log('✅ Task toggled:', taskId);
+        } catch (error) {
+            console.error('Error toggling task:', error);
+            throw error;
+        }
     }
 
     getUserId(): string | null {

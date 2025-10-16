@@ -21,17 +21,20 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
         // Define the initialization function
         const initDb = async () => {
             try {
-                // Initialize database
+                console.log("🚀 Initializing database provider...");
+
+                // Initialize database service (this will also handle authentication)
                 await databaseService.initDatabase();
-                console.log("Supabase database initialized successfully");
+                console.log("✅ Database service initialized successfully");
 
                 // Load data into store
                 try {
                     // Get the function directly from the store to avoid subscription
                     await useCoach.getState().loadData();
-                    console.log("Data loaded into store");
+                    console.log("✅ Data loaded into store");
                 } catch (loadErr) {
-                    console.error("Error loading data:", loadErr);
+                    console.error("❌ Error loading data:", loadErr);
+                    // Don't throw here, just log the error and continue
                 }
 
                 if (isMounted) {
@@ -40,7 +43,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
                     setError(null);
                 }
             } catch (err) {
-                console.error("Database initialization failed:", err);
+                console.error("❌ Database initialization failed:", err);
                 if (isMounted) {
                     if (timeoutId) clearTimeout(timeoutId);
                     setError(err instanceof Error ? err.message : "Database initialization failed");
