@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { shallow } from 'zustand/shallow';
 import { databaseService } from '@/services/database';
 import { nanoid } from 'nanoid/non-secure';
 
@@ -43,6 +44,11 @@ const defaultSettings: Settings = {
   focusAreas: [],
   notifications: false,
   adsConsent: 'not_set',
+};
+
+// Create selectors using shallow equality
+const createSelector = <T>(selector: (state: CoachState) => T) => {
+  return (state: CoachState) => selector(state);
 };
 
 export const useCoach = create<CoachState>((set, get) => ({
@@ -116,5 +122,14 @@ export const useCoach = create<CoachState>((set, get) => ({
     });
   },
 
-  hasGoals: () => get().goals.length > 0,
+  // Memoized version to prevent re-renders
+  hasGoals: () => {
+    return get().goals.length > 0;
+  },
 }));
+
+// Helper selectors to avoid excessive rerenders in components
+export const usePlanSelector = () => useCoach(state => state.plans, shallow);
+export const useGoalsSelector = () => useCoach(state => state.goals, shallow);
+export const useSettingsSelector = () => useCoach(state => state.settings, shallow);
+export const useOnboardingSelector = () => useCoach(state => state.onboardingDone);
