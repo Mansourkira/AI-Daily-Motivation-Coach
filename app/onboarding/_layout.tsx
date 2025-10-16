@@ -1,14 +1,12 @@
-// app/(tabs)/_layout.tsx
-import { Tabs } from 'expo-router'
-import { Feather } from '@expo/vector-icons'
+import { Stack } from 'expo-router';
 
-export default function TabsLayout() {
+export default function OnboardingLayout() {
     return (
-        <Tabs screenOptions={{ headerShown: false, tabBarShowLabel: false }}>
-            <Tabs.Screen name="index" options={{ tabBarIcon: ({ color, size }) => <Feather name="calendar" color={color} size={size} /> }} />
-            <Tabs.Screen name="goals" options={{ tabBarIcon: ({ color, size }) => <Feather name="target" color={color} size={size} /> }} />
-            <Tabs.Screen name="history" options={{ tabBarIcon: ({ color, size }) => <Feather name="check-circle" color={color} size={size} /> }} />
-            <Tabs.Screen name="settings" options={{ tabBarIcon: ({ color, size }) => <Feather name="settings" color={color} size={size} /> }} />
-        </Tabs>
-    )
+        <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="language" />
+            <Stack.Screen name="categories" />
+            <Stack.Screen name="quick" />
+            <Stack.Screen name="review" />
+        </Stack>
+    );
 }
