@@ -1,21 +1,29 @@
 {
   "expo": {
-    "name": "AI Daily Coach",
-    "slug": "ai-daily-coach",
-    "scheme": "aidailycoach",
+    "name": "RiseMind",
+    "slug": "risemind",
+    "scheme": "risemind",
+    "icon": "./assets/logo.png",
+    "splash": {
+      "image": "./assets/logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "experiments": {
       "typedRoutes": true
     },
     "plugins": [
-      "expo-router",
-      "expo-notifications",
-      "react-native-google-mobile-ads"
+      "expo-router"
     ],
     "android": {
-      "package": "com.mansour1997.aidailycoach"
+      "package": "com.mansour1997.risemind",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/logo.png",
+        "backgroundColor": "#ffffff"
+      }
     },
     "ios": {
-      "bundleIdentifier": "com.mansour1997.aidailycoach"
+      "bundleIdentifier": "com.mansour1997.risemind"
     },
     "extra": {
       "eas": {
