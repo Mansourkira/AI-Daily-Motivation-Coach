@@ -9,7 +9,7 @@ export async function generatePlan({ date, tweak }: GenInput): Promise<DailyPlan
   const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/generate-plan`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stri0ngify({ goals, settings, tweak, date }),
+    body: JSON.stringify({ goals, settings, tweak, date }),
   }).catch(() => null);
 
   // Fallback to local mock if API unavailable

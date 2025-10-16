@@ -1,18 +1,13 @@
-import * as Notifications from 'expo-notifications';
+// Note: Push notifications require a development build in Expo SDK 53+
+// These functions are disabled for Expo Go compatibility
 
 export async function ensureNotificationPermission(): Promise<boolean> {
-  const { status } = await Notifications.requestPermissionsAsync();
-  return status === 'granted';
+  console.log('Notifications disabled in Expo Go - requires development build');
+  return false;
 }
 
 export async function scheduleMorningPing(hour = 9, minute = 0) {
-  const trigger = new Date();
-  trigger.setDate(trigger.getDate() + 1);
-  trigger.setHours(hour, minute, 0, 0);
-  await Notifications.scheduleNotificationAsync({
-    content: { title: "Your plan is ready", body: "Open AI Daily Coach to see today's tasks." },
-    trigger,
-  });
+  console.log('Scheduling notifications disabled in Expo Go - requires development build');
 }
 
 
