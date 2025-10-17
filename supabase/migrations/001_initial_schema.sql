@@ -1,103 +1,226 @@
--- Create users table
-CREATE TABLE IF NOT EXISTS public.users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    onboarding_done BOOLEAN DEFAULT FALSE,
-    name TEXT
+-- =========================================================
+-- RiseMind (strict ownership model)
+-- auth.users is the source of truth; our "profiles.id" == auth.uid()
+-- =========================================================
+
+create extension if not exists pgcrypto;
+
+-- reusable trigger to keep updated_at fresh
+create or replace function public.tg_set_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at := now();
+  return new;
+end$$;
+
+-- --------------------------
+-- 1) profiles (user management)
+-- --------------------------
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  onboarding_done boolean not null default false,
+  name text
 );
 
--- Create settings table
-CREATE TABLE IF NOT EXISTS public.settings (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    locale TEXT NOT NULL DEFAULT 'en' CHECK (locale IN ('en', 'fr', 'ar')),
-    wake_time TEXT NOT NULL DEFAULT '07:00',
-    focus_areas TEXT[] DEFAULT '{}',
-    notifications BOOLEAN DEFAULT FALSE,
-    ads_consent TEXT DEFAULT 'not_set' CHECK (ads_consent IN ('granted', 'denied', 'not_set')),
-    UNIQUE(user_id)
+drop trigger if exists set_profiles_updated_at on public.profiles;
+create trigger set_profiles_updated_at
+before update on public.profiles
+for each row execute procedure public.tg_set_updated_at();
+
+-- --------------------------
+-- 2) settings (1:1 with profiles)
+-- --------------------------
+create table if not exists public.settings (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  locale text not null default 'en' check (locale in ('en','fr','ar')),
+  wake_time text not null default '07:00' check (wake_time ~ '^[0-2][0-9]:[0-5][0-9]$'),
+  focus_areas text[] not null default '{}'::text[] check (array_length(focus_areas,1) is null or array_length(focus_areas,1) <= 3),
+  notifications boolean not null default false,
+  ads_consent text not null default 'not_set' check (ads_consent in ('granted','denied','not_set')),
+
+  unique (user_id)
 );
 
--- Create goals table
-CREATE TABLE IF NOT EXISTS public.goals (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    text TEXT NOT NULL,
-    archived_at TIMESTAMP WITH TIME ZONE
+drop trigger if exists set_settings_updated_at on public.settings;
+create trigger set_settings_updated_at
+before update on public.settings
+for each row execute procedure public.tg_set_updated_at();
+
+-- --------------------------
+-- 3) goals (<=3 active per user – enforce in app for MVP)
+-- --------------------------
+create table if not exists public.goals (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  text text not null check (length(text) <= 80),
+  archived_at timestamptz
 );
 
--- Create plans table
-CREATE TABLE IF NOT EXISTS public.plans (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    date DATE NOT NULL,
-    source_prompt_hash TEXT,
-    UNIQUE(user_id, date)
+-- --------------------------
+-- 4) plans (one per user per date)
+-- --------------------------
+create table if not exists public.plans (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  date date not null,
+  source_prompt_hash text,
+  unique (user_id, date)
 );
 
--- Create tasks table
-CREATE TABLE IF NOT EXISTS public.tasks (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    plan_id UUID NOT NULL REFERENCES public.plans(id) ON DELETE CASCADE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    text TEXT NOT NULL,
-    at TEXT,
-    done BOOLEAN DEFAULT FALSE,
-    order_index INTEGER NOT NULL
+-- --------------------------
+-- 5) tasks (children of plans)
+-- --------------------------
+create table if not exists public.tasks (
+  id uuid primary key default gen_random_uuid(),
+  plan_id uuid not null references public.plans(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  text text not null,
+  at text, -- 'HH:MM' optional
+  done boolean not null default false,
+  order_index int not null default 0 check (order_index >= 0)
 );
 
--- Create indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_settings_user_id ON public.settings(user_id);
-CREATE INDEX IF NOT EXISTS idx_goals_user_id ON public.goals(user_id);
-CREATE INDEX IF NOT EXISTS idx_goals_archived_at ON public.goals(archived_at) WHERE archived_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_plans_user_id ON public.plans(user_id);
-CREATE INDEX IF NOT EXISTS idx_plans_date ON public.plans(date);
-CREATE INDEX IF NOT EXISTS idx_tasks_plan_id ON public.tasks(plan_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_order ON public.tasks(plan_id, order_index);
+-- --------------------------
+-- 6) catalogs (optional but useful for UX)
+-- --------------------------
+create table if not exists public.focus_area_catalog (
+  key text primary key,               -- e.g. 'health','study','work','finance','faith','personal','relationships'
+  label_en text not null,
+  label_fr text not null,
+  label_ar text not null
+);
 
--- Enable Row Level Security
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.goals ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.plans ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
+create table if not exists public.goal_suggestion_catalog (
+  id uuid primary key default gen_random_uuid(),
+  focus_area_key text not null references public.focus_area_catalog(key) on delete cascade,
+  text_en text not null,
+  text_fr text not null,
+  text_ar text not null
+);
 
--- Create RLS policies for anonymous access (for demo/MVP)
--- In production, you would use auth.uid() instead
+-- Seed basic focus areas (you can add more)
+insert into public.focus_area_catalog(key,label_en,label_fr,label_ar) values
+('health','health','santé','الصحة'),
+('study','study','études','الدراسة'),
+('work','work','travail','العمل'),
+('finance','finance','finances','المال'),
+('faith','faith','foi','الإيمان'),
+('personal','personal','personnel','شخصي'),
+('relationships','relationships','relations','العلاقات')
+on conflict (key) do nothing;
 
--- Users policies (allow all for now)
-CREATE POLICY "Enable all operations for users" ON public.users FOR ALL USING (true) WITH CHECK (true);
+-- --------------------------
+-- Indexes
+-- --------------------------
+create index if not exists idx_settings_user_id on public.settings(user_id);
 
--- Settings policies
-CREATE POLICY "Enable all operations for settings" ON public.settings FOR ALL USING (true) WITH CHECK (true);
+create index if not exists idx_goals_user_id on public.goals(user_id);
+create index if not exists idx_goals_archived_active on public.goals(user_id) where archived_at is null;
 
--- Goals policies
-CREATE POLICY "Enable all operations for goals" ON public.goals FOR ALL USING (true) WITH CHECK (true);
+create index if not exists idx_plans_user_id on public.plans(user_id);
+create index if not exists idx_plans_date on public.plans(date);
 
--- Plans policies
-CREATE POLICY "Enable all operations for plans" ON public.plans FOR ALL USING (true) WITH CHECK (true);
+create index if not exists idx_tasks_plan_id on public.tasks(plan_id);
+create index if not exists idx_tasks_order on public.tasks(plan_id, order_index);
 
--- Tasks policies
-CREATE POLICY "Enable all operations for tasks" ON public.tasks FOR ALL USING (true) WITH CHECK (true);
+-- =========================================================
+-- RLS (strict: each row belongs to auth.uid())
+-- =========================================================
+alter table public.profiles enable row level security;
+alter table public.settings enable row level security;
+alter table public.goals    enable row level security;
+alter table public.plans    enable row level security;
+alter table public.tasks    enable row level security;
+alter table public.focus_area_catalog enable row level security;
+alter table public.goal_suggestion_catalog enable row level security;
 
--- Create updated_at trigger function
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- Read-only to everyone for catalogs
+drop policy if exists "catalogs are readable" on public.focus_area_catalog;
+create policy "catalogs are readable" on public.focus_area_catalog
+  for select to authenticated using (true);
 
--- Add triggers for updated_at
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON public.users
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+drop policy if exists "goal suggestions are readable" on public.goal_suggestion_catalog;
+create policy "goal suggestions are readable" on public.goal_suggestion_catalog
+  for select to authenticated using (true);
 
-CREATE TRIGGER update_settings_updated_at BEFORE UPDATE ON public.settings
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Ownership policies
+drop policy if exists "own profile" on public.profiles;
+create policy "own profile" on public.profiles
+  for all to authenticated
+  using (id = auth.uid())
+  with check (id = auth.uid());
 
+drop policy if exists "own settings" on public.settings;
+create policy "own settings" on public.settings
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists "own goals" on public.goals;
+create policy "own goals" on public.goals
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists "own plans" on public.plans;
+create policy "own plans" on public.plans
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists "own tasks" on public.tasks;
+create policy "own tasks" on public.tasks
+  for all to authenticated
+  using (
+    plan_id in (select id from public.plans where user_id = auth.uid())
+  )
+  with check (
+    plan_id in (select id from public.plans where user_id = auth.uid())
+  );
+
+-- =========================================================
+-- Helper RPC: upsert profile + settings in one call after auth
+-- =========================================================
+create or replace function public.upsert_profile_settings(
+  p_name text,
+  p_locale text,
+  p_wake_time text,
+  p_focus_areas text[],
+  p_notifications boolean,
+  p_ads_consent text
+) returns void
+language plpgsql
+security definer
+as $$
+begin
+  insert into public.profiles (id, name, onboarding_done)
+  values (auth.uid(), p_name, true)
+  on conflict (id) do update set
+    name = excluded.name,
+    onboarding_done = true,
+    updated_at = now();
+
+  insert into public.settings (user_id, locale, wake_time, focus_areas, notifications, ads_consent)
+  values (auth.uid(), coalesce(p_locale,'en'), coalesce(p_wake_time,'07:00'),
+          coalesce(p_focus_areas, '{}'::text[]), coalesce(p_notifications,false), coalesce(p_ads_consent,'not_set'))
+  on conflict (user_id) do update set
+    locale = excluded.locale,
+    wake_time = excluded.wake_time,
+    focus_areas = excluded.focus_areas,
+    notifications = excluded.notifications,
+    ads_consent = excluded.ads_consent,
+    updated_at = now();
+end;
+$$;
+
+-- allow authenticated users to call it
+revoke all on function public.upsert_profile_settings(text,text,text,text[],boolean,text) from public;
+grant execute on function public.upsert_profile_settings(text,text,text,text[],boolean,text) to authenticated;
